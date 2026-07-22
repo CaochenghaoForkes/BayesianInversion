@@ -1,0 +1,318 @@
+{
+    "case_name": "triso_bayesian_learning",
+    "random_seed": 20260711,
+
+    "parameters": [
+        {"name": "log_D_pyc" ,"initial": -3.2},
+        {"name": "log_D_sic" ,"initial": -8.86},
+        {"name": "A_pyc" ,"initial": 222e3},
+        {"name": "A_sic" ,"initial": 125e3}
+    ],
+
+    "prior": {
+        "joint_prior": {
+            "type": "independent"
+        },
+        "single_parameter_prior": {
+            "log_D_pyc": {
+                "lower": -4.2,
+                "upper": -2.2,
+                "type": "normal",
+                "normal" : {
+                    "mean": -3.2,
+                    "sigma": 1.2
+                }
+            },
+            "log_D_sic": {
+                "lower": -9.86,
+                "upper": -7.86,
+                "type": "normal",
+                "normal" : {
+                    "mean": -8.86,
+                    "sigma": 1.2
+                }
+            },
+            "A_pyc": {
+                "lower": 200e3,
+                "upper": 240e3,
+                "type": "normal",
+                "normal" : {
+                    "mean": 222e3,
+                    "sigma": 10e3
+                }
+            },
+            "A_sic": {
+                "lower": 115e3,
+                "upper": 135e3,
+                "type": "normal",
+                "normal" : {
+                    "mean": 125e3,
+                    "sigma": 10e3
+                }
+            }
+        }
+    },
+
+    "data": {
+        "name": ["t1","release1","t2","release2","t3","release3","t4","release4"],
+        "data_source": "SourceTermAnalysis/pseudo_experiment_release.csv",
+        "value": null
+    },
+
+    "likelihood": {
+        "joint_likelihood": {
+            "data_order": ["release1","release2","release3","release4"],
+            "distribution": {
+                "type": "normal",
+                "student_t": {
+                    "degrees_of_freedom": 5.0
+                }
+            },
+            "correlation": {
+                "type": "block_matrix",
+                "complete_matrix_source": "correlation_matrix.csv",
+                "block_matrix": {
+                    "release1_release2": {
+                        "data_i": "release1",
+                        "data_j": "release2",
+                        "type": "independent",
+                        "complete_matrix_source": "y1_y2_matrix.csv",
+                        "correlation_value": 0.4,
+                        "exponential": {
+                            "length_scale": 10.0
+                        }
+                    },
+                    "release1_release3": {
+                        "data_i": "release1",
+                        "data_j": "release3",
+                        "type": "independent",
+                        "complete_matrix_source": "y1_y2_matrix.csv",
+                        "correlation_value": 0.4,
+                        "exponential": {
+                            "length_scale": 10.0
+                        }
+                    },
+                    "release1_release4": {
+                        "data_i": "release1",
+                        "data_j": "release4",
+                        "type": "independent",
+                        "complete_matrix_source": "y1_y2_matrix.csv",
+                        "correlation_value": 0.4,
+                        "exponential": {
+                            "length_scale": 10.0
+                        }
+                    },
+                    "release2_release3": {
+                        "data_i": "release2",
+                        "data_j": "release3",
+                        "type": "independent",
+                        "complete_matrix_source": "y1_y2_matrix.csv",
+                        "correlation_value": 0.4,
+                        "exponential": {
+                            "length_scale": 10.0
+                        }
+                    },
+                    "release2_release4": {
+                        "data_i": "release2",
+                        "data_j": "release4",
+                        "type": "independent",
+                        "complete_matrix_source": "y1_y2_matrix.csv",
+                        "correlation_value": 0.4,
+                        "exponential": {
+                            "length_scale": 10.0
+                        }
+                    },
+                    "release3_release4": {
+                        "data_i": "release3",
+                        "data_j": "release4",
+                        "type": "independent",
+                        "complete_matrix_source": "y1_y2_matrix.csv",
+                        "correlation_value": 0.4,
+                        "exponential": {
+                            "length_scale": 10.0
+                        }
+                    }
+                }
+            }
+        },
+        "single_data_likelihood": [
+            {   
+                "name": "release1",
+                "coordinate": "t1",
+                "space": "log10",
+                "epsilon": 1e-100,
+                "point_correlation": {
+                    "type": "exponential",
+                    "complete_matrix": {
+                        "source": "y1_point_correlation.csv"
+                    },
+                    "exponential": {
+                        "length_scale": 1800
+                    }
+                },
+                "sigma_exp": {
+                    "type": "relative",
+                    "absolute": {
+                        "value": 1.5
+                    },
+                    "relative": {
+                        "ratio": 0.1
+                    }
+                },
+                "sigma_model": {
+                    "type": "relative",
+                    "absolute": {
+                        "value": 1.5
+                    },
+                    "relative": {
+                        "ratio": 0.1
+                    }
+                }
+            },
+            {   
+                "name": "release2",
+                "coordinate": "t2",
+                "space": "log10",
+                "epsilon": 1e-100,
+                "point_correlation": {
+                    "type": "exponential",
+                    "complete_matrix": {
+                        "source": "y1_point_correlation.csv"
+                    },
+                    "exponential": {
+                        "length_scale": 1800
+                    }
+                },
+                "sigma_exp": {
+                    "type": "relative",
+                    "absolute": {
+                        "value": 1.5
+                    },
+                    "relative": {
+                        "ratio": 0.1
+                    }
+                },
+                "sigma_model": {
+                    "type": "relative",
+                    "absolute": {
+                        "value": 1.5
+                    },
+                    "relative": {
+                        "ratio": 0.1
+                    }
+                }
+            },
+            {   
+                "name": "release3",
+                "coordinate": "t3",
+                "space": "log10",
+                "epsilon": 1e-100,
+                "point_correlation": {
+                    "type": "exponential",
+                    "complete_matrix": {
+                        "source": "y1_point_correlation.csv"
+                    },
+                    "exponential": {
+                        "length_scale": 1800
+                    }
+                },
+                "sigma_exp": {
+                    "type": "relative",
+                    "absolute": {
+                        "value": 1.5
+                    },
+                    "relative": {
+                        "ratio": 0.1
+                    }
+                },
+                "sigma_model": {
+                    "type": "relative",
+                    "absolute": {
+                        "value": 1.5
+                    },
+                    "relative": {
+                        "ratio": 0.1
+                    }
+                }
+            },
+            {   
+                "name": "release4",
+                "coordinate": "t4",
+                "space": "log10",
+                "epsilon": 1e-100,
+                "point_correlation": {
+                    "type": "exponential",
+                    "complete_matrix": {
+                        "source": "y1_point_correlation.csv"
+                    },
+                    "exponential": {
+                        "length_scale": 1800
+                    }
+                },
+                "sigma_exp": {
+                    "type": "relative",
+                    "absolute": {
+                        "value": 1.5
+                    },
+                    "relative": {
+                        "ratio": 0.1
+                    }
+                },
+                "sigma_model": {
+                    "type": "relative",
+                    "absolute": {
+                        "value": 1.5
+                    },
+                    "relative": {
+                        "ratio": 0.1
+                    }
+                }
+            }
+        ]
+    },
+
+    "model": {
+        "type": "mars",
+        "mars": {
+            "work_dir": "SourceTermAnalysis",
+            "case_map": {
+                "exp1.xml": {
+                    "time": "t1",
+                    "release_rate": "release1"
+                },
+                "exp2.xml": {
+                    "time": "t2",
+                    "release_rate": "release2"
+                },
+                "exp3.xml": {
+                    "time": "t3",
+                    "release_rate": "release3"
+                },
+                "exp4.xml": {
+                    "time": "t4",
+                    "release_rate": "release4"
+                }
+            }
+        }
+    },
+
+    "sampler": {
+        "sampler_label": "mcmctest",
+        "type": "emcee",
+        "n_walkers": 18,
+        "n_processes": 12,
+        "n_steps": 500,
+        "burn_in": 100,
+        "thin": 2,
+        "initial_spread": {
+            "log_D_pyc": 0.08,
+            "log_D_sic": 0.08,
+            "A_pyc": 1000.0,
+            "A_sic": 500.0
+        }
+    },
+
+    "output": {
+        "output_dir": "results/triso_bayesian_learning"
+    }
+}

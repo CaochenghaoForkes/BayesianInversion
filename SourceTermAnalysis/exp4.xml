@@ -1,0 +1,195 @@
+<?xml version='1.0' encoding='utf-8'?>
+<COSMOS>
+    <MARS>
+        <FuelProperties>
+            <Geometry>
+                <ElementRadius unit="[cm]" value="2.5 3.0" />
+                <GraphiteGrainRadius unit="[cm]" value="0.0006" />
+                <TrisoParticleRadius unit="[cm]" value="0.0272 0.0369 0.0402 0.0436 0.0475" />
+            </Geometry>
+            <ParticleNumber value="2800" />
+            <UraniumContaminationFraction>
+                <GraphiteMatrixContamination value="0.0 0.0" />
+                <GraphiteGrainContamination value="0.0" />
+                <TrisoParticleContamination value="0.0 1e-3 1e-4 1e-6 1e-6" />
+            </UraniumContaminationFraction>
+            <MaterialProperties>
+                <Kernel>
+                    <KernelMolarMass unit="[g]/[mol]" value="269.8946" />
+                    <KernelDensity unit="[g]/[cm3]" value="10.96" />
+                </Kernel>
+                <Buffer>
+                    <BufferPorosity value="0.5" />
+                    <BufferDensity unit="[g]/[cm3]" value="0.95" />
+                </Buffer>
+                <PyC>
+                    <PyCCreepCoef value="0.0002715" />
+                    <PyCCreepPoissonRatio value="0.5" />
+                    <PyCPoissonRatio value="0.33" />
+                    <PyCDensity unit="[g]/[cm3]" value="1.9" />
+                </PyC>
+                <SiC>
+                    <SiCDensity unit="[g]/[cm3]" value="3.2" />
+                    <SiCTensileStrength unit="[MPa]" value="834.0" />
+                    <SiCWeibull value="8.02" />
+                    <SiCThermalDecompositionAlpha value="0.0001" />
+                    <SiCThermalDecompositionBeta value="4.0" />
+                    <SiCManufacturingFailureFraction value="0" />
+                </SiC>
+                <GraphiteMatrix>
+                    <GraphiteMatrixDensity unit="[g]/[cm3]" value="1.75" />
+                </GraphiteMatrix>
+            </MaterialProperties>
+        </FuelProperties>
+        <Models>
+            <IntraPebbleTemperature mode="uniform">
+                <GraphiteMatrixTemperatureZonesNumber value="0" />
+                <TransientTemperatureFieldBegin unit="[s]" value="1e+30" />
+            </IntraPebbleTemperature>
+            <Recoil mode="off">
+                <ElementRecoilRadius unit="[cm]" value="0.0 0.0" />
+                <GraphiteGrainRecoilRadius unit="[cm]" value="0.0" />
+                <TrisoParticleRecoilRadius unit="[cm]" value="0.0 0.0 0.0 0.0 0.0" />
+            </Recoil>
+            <FuelPerformance mode="StepFailure">
+                <FailureThreshold value="2e-03" />
+                <StepFailureFractionIncrement value="" time_unit="[s]" time="" />
+                <Pressure mode="IdealGas">
+                    <RedlichKwong>
+                        <TcCO unit="[K]" value="132.91" />
+                        <TcKr unit="[K]" value="209.45" />
+                        <TcXe unit="[K]" value="589.75" />
+                        <PcCO unit="[Pa]" value="3500000.0" />
+                        <PcKr unit="[Pa]" value="5500000.0" />
+                        <PcXe unit="[Pa]" value="5900000.0" />
+                    </RedlichKwong>
+                    <VanDerWaals>
+                        <ConstantACO value="1.505e-07" />
+                        <ConstantAKr value="2.349e-07" />
+                        <ConstantAXe value="4.25e-07" />
+                        <ConstantBCO value="3.985e-05" />
+                        <ConstantBKr value="3.978e-05" />
+                        <ConstantBXe value="5.105e-06" />
+                    </VanDerWaals>
+                </Pressure>
+                <XeYield value="0.15" />
+                <KrYield value="0.16" />
+                <FastNeutronShare value="1.0" />
+                <FPCorrosion mode="Attenuation" />
+                <PyCSwelling mode="TecDoc1647-1" />
+                <PyCCreepCoef mode="TecDoc1647" />
+                <SiCStress mode="Bubble" />
+                <IntergranularCorrosion mode="off" />
+            </FuelPerformance>
+            <Adsorption mode="Isotherm">
+                <FrescoSimplify>
+                    <HenryConstantA value="21.94" />
+                    <HenryConstantB value="-44093" />
+                    <FreundlichConstantA value="22.11" />
+                    <FreundlichConstantB value="-44543" />
+                    <FreundlichConstantE value="-1.3689" />
+                    <FreundlichConstantF value="3683" />
+                    <ConvertConcentration value="1.13" unit="[mol]/[g]" />
+                </FrescoSimplify>
+                <A_iso value="25.14" />
+                <B_iso value="-44930" />
+                <D_iso value="-3.118" />
+                <E_iso value="6707" />
+                <d1_iso value="0.122" />
+                <d2_iso value="0" />
+                <EnvironmentPressure value="4e6" unit="[Pa]" />
+                <EnvironmentComponent value="Helium" />
+                <EnvironmentMolarFraction value="1.0" />
+                <EnvironmentMolarMass value="4.0" unit="[g]/[mol]" />
+                <DynamicViscosity mode="GETTER" />
+                <CoolantDensity mode="GETTER" />
+                <BinaryDiffusionCoef mode="LiJian" /> 
+                <CoolantVelocity value="2" unit="[m]/[s]" />
+                <CorePorosity value="1.0" />
+            </Adsorption>
+            <MassTransfer mode="Constant">
+                <ElementMassTransferCoef unit="[cm]/[s]" value="50.0" />
+                <GraphiteGrainMassTransferCoef unit="[cm]/[s]" value="100.0" />
+                <TrisoParticleMassTransferCoef unit="[cm]/[s]" value="100.0" />
+                <FailureKernelMassTransferCoef unit="[cm]/[s]" value="100.0" />
+            </MassTransfer>
+            <Diffusion mode="Numerical" />
+        </Models>
+        <Conditions>
+            <BoundaryCondition>
+                <ElementEnvironmentConcentration unit="[Bq]/[cm3]" value="0.0" />
+                <ParticleEnvironmentConcentration unit="[Bq]/[cm3]" value="0.0" />
+            </BoundaryCondition>
+            <InitialCondition>
+                <ElementInitialInventory unit="[Bq]" value="1.0" />
+                <InitialTemperature unit="[C]" value="1103" />
+            </InitialCondition>
+        </Conditions>
+        <Solver>
+            <Mesh>
+                <ElementMeshNumber value="10 20" />
+                <GraphiteGrainMeshNumber value="10" />
+                <TrisoParticleMeshNumber value="50 50 50 50 50" />
+                <ElementMeshBias value="0.0 0.0" />
+                <GraphiteGrainMeshBias value="0.0" />
+                <TrisoParticleMeshBias value="0.0 0.0 0.0 0.0 0.0" />
+            </Mesh>
+            <DiffusionSolver time_weight="0.5">
+                <ElementDiffusionSolver mode="fvm_euler_thomas" />
+                <GraphiteGrainDiffusionSolver mode="fvm_euler_thomas" />
+                <TrisoParticleDiffusionSolver mode="fvm_euler_thomas" />
+                <FailureKernelDiffusionSolver mode="fvm_euler_thomas" />
+            </DiffusionSolver>
+            <IntraPebbleTemperatureSolver>
+                <SteadyTemperatureFieldMaxIterations value="10000" />
+                <SteadyTemperatureFieldResidual value="0.0002" />
+                <TransientTemperatureFieldMaxIterations value="20" />
+                <TransientTemperatureFieldResidual value="0.02" />
+            </IntraPebbleTemperatureSolver>
+            <FuelPerformanceSolver>
+                <SteadyGasesReleaseFractionMaxIterations value="3000" />
+            </FuelPerformanceSolver>
+            <FailureAdjustment mode="on" split_num="10" adjust_time_step_num="10" />
+        </Solver>
+    </MARS>
+    <MARS-MARS>
+        <HTRPMFSARMode value="off" />
+        <Control>
+            <RequiredSimulationTime unit="[h]" value="270" />
+            <RequiredTimeStep unit="[h]" value="0.5" />
+            <Output>
+                <OutputPath value="EXP/exp4" />
+                <WriteInterval unit="[s]" value="-1" />
+                <Type value="ReleaseRate Inventory ReleaseCumulant DiffusionCoef" />
+                <Distribution value="" time="" />
+            </Output>
+        </Control>
+        <SimulationConditions>
+            <RequiredNuc name="Cs137">
+                <DecayConstant unit="/[s]" value="" />
+                <DiffusionCoef>
+                    <GraphiteMatrixDiffusionPreExponential unit="[cm2]/[s]" value="3.6" />
+                    <GraphiteGrainDiffusionPreExponential unit="[cm2]/[s]" value="1.0" />
+                    <KernelDiffusionPreExponential unit="[cm2]/[s]" value="5.6e-4" />
+                    <BufferDiffusionPreExponential unit="[cm2]/[s]" value="1e-4" />
+                    <PyCDiffusionPreExponential unit="[cm2]/[s]" value="6.3e-4" />
+                    <SiCDiffusionPreExponential unit="[cm2]/[s]" value="1.38011E-9" />
+                    <GraphiteMatrixActivationEnergy unit="[J]/[mol]" value="189e3" />
+                    <GraphiteGrainActivationEnergy unit="[J]/[mol]" value="0.0" />
+                    <KernelActivationEnergy unit="[J]/[mol]" value="209e3" />
+                    <BufferActivationEnergy unit="[J]/[mol]" value="0.0" />
+                    <PyCActivationEnergy unit="[J]/[mol]" value="222e3" />
+                    <SiCActivationEnergy unit="[J]/[mol]" value="125e3" />
+                </DiffusionCoef>
+            </RequiredNuc>
+            <RequiredTemperature unit="[C]" value="1550 1550" time_unit="[h]" time="0.0 1e10" />
+            <RequiredInventory unit="[Bq]" value="1.0 1.0" time_unit="[h]" time="0.0 1e10" />
+            <ElementPower unit="[J]/[s]" value="0.0 0.0" time_unit="[h]" time="0.0 1e+30" />
+            <Burnup unit="[GW][d]/[t]" value="0.0 200.0 200.0" time_unit="[d]" time="0.0 500 1e+20" />
+            <NeutronFlux unit="[n]/[m2][s]" value="3.194444e17 3.194444e17 0.0 0.0" time_unit="[d]" time="0.0 500 500.02 1e10" />
+            <AccidentTime value="1e10" unit="[s]" />
+        </SimulationConditions>
+    </MARS-MARS>
+    <CORE-MARS>
+    </CORE-MARS>
+</COSMOS>
