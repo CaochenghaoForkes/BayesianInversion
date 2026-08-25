@@ -381,7 +381,6 @@
 
     "sampler": {
         "type": "emcee",
-        "n_walkers": 12,
         "n_processes": 6,
         "burn_in": 2000,
         "production_steps": 8000,
@@ -391,6 +390,14 @@
             "log_D_sic": 0.08,
             "A_pyc": 1000.0,
             "A_sic": 500.0
+        },
+        "emcee": {
+            "n_walkers": 12,
+            "move_weights": {
+                "stretch": 0.0,
+                "de": 0.8,
+                "de_snooker": 0.2
+            }
         }
     },
 

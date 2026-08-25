@@ -240,13 +240,28 @@ class InputCard:
     class Sampler:
         """采样器配置"""
 
-        n_walkers: int
+        @dataclass
+        class Emcee:
+            """emcee采样器专用配置"""
+
+            @dataclass
+            class MoveWeights:
+                """emcee各提议方法的相对选择权重"""
+
+                stretch: float
+                de: float
+                de_snooker: float
+
+            n_walkers: int
+            move_weights: MoveWeights
+
         n_processes: int
         production_steps: int
         burn_in: int
         thin: int
         initial_spread: dict[str,float]
         type: str = "emcee"
+        emcee: Emcee | None = None
 
     @dataclass
     class Output:
@@ -656,8 +671,21 @@ class Examine:
         sampler = input_card.sampler
         if sampler.type != "emcee":
             raise NotImplementedError(f"未实现的采样器: {sampler.type}")
-        if sampler.n_walkers < 2*len(input_card.parameters):
+        if sampler.emcee is None:
+            raise ValueError("sampler.emcee 不能为空")
+        if sampler.emcee.n_walkers < 2*len(input_card.parameters):
             raise ValueError("emcee n_walkers 至少应为参数数量的 2 倍")
+
+        move_weights = sampler.emcee.move_weights
+        weights = (
+            move_weights.stretch,
+            move_weights.de,
+            move_weights.de_snooker,
+        )
+        if any(not math.isfinite(weight) or weight < 0.0 for weight in weights):
+            raise ValueError("emcee move_weights 必须为非负有限数值")
+        if sum(weights) <= 0.0:
+            raise ValueError("emcee move_weights 至少应有一个正权重")
         if sampler.n_processes < 1:
             raise ValueError("n_processes 必须大于或等于 1")
         if sampler.burn_in < 1:
@@ -994,14 +1022,27 @@ class JsonReader:
         else:
             raise KeyError("sampler.production_steps")
 
+        emcee_data = data.get("emcee", {})
+        move_data = emcee_data.get("move_weights", {})
+        n_walkers = emcee_data.get("n_walkers", data.get("n_walkers"))
+        if n_walkers is None:
+            raise KeyError("sampler.emcee.n_walkers")
+
         return InputCard.Sampler(
-            n_walkers=data["n_walkers"],
             n_processes=data["n_processes"],
             production_steps=production_steps,
             burn_in=burn_in,
             thin=data.get("thin", 1),
             initial_spread=data["initial_spread"],
             type=data.get("type", "emcee"),
+            emcee=InputCard.Sampler.Emcee(
+                n_walkers=n_walkers,
+                move_weights=InputCard.Sampler.Emcee.MoveWeights(
+                    stretch=move_data.get("stretch", 1.0),
+                    de=move_data.get("de", 0.0),
+                    de_snooker=move_data.get("de_snooker", 0.0),
+                ),
+            ),
         )
 
     @staticmethod

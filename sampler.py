@@ -58,7 +58,9 @@ class Sampler:
         study_name: str,
     ):
         self.sampler_type = sampler_config.type
-        self.n_walkers = sampler_config.n_walkers
+        if sampler_config.emcee is None:
+            raise ValueError("sampler.emcee 不能为空")
+        self.n_walkers = sampler_config.emcee.n_walkers
         self.initial_spread = sampler_config.initial_spread
         self.sampler_dict = {
             "emcee": EmceeSampler(
@@ -136,8 +138,12 @@ class EmceeSampler:
         sampler_config: InputCard.Sampler,
         study_name: str,
     ):
+        if sampler_config.emcee is None:
+            raise ValueError("sampler.emcee 不能为空")
+
         self.study_name = study_name
-        self.n_walkers = sampler_config.n_walkers
+        self.n_walkers = sampler_config.emcee.n_walkers
+        self.move_weights = sampler_config.emcee.move_weights
         self.n_processes = sampler_config.n_processes
         self.burn_in = sampler_config.burn_in
         self.production_steps = sampler_config.production_steps
@@ -199,7 +205,23 @@ class EmceeSampler:
             args=args,
             parameter_names=parameter_names,
             pool=pool,
+            moves=self._moves(emcee),
         )
+
+    def _moves(self,emcee):
+        """按照配置权重构造emcee提议方法"""
+
+        configured_moves = (
+            (emcee.moves.StretchMove,self.move_weights.stretch),
+            (emcee.moves.DEMove,self.move_weights.de),
+            (emcee.moves.DESnookerMove,self.move_weights.de_snooker),
+        )
+
+        return [
+            (move(),weight)
+            for move,weight in configured_moves
+            if weight > 0.0
+        ]
 
     def _run(
         self,
@@ -274,6 +296,11 @@ class EmceeSampler:
             metadata={
                 "sampler":"emcee",
                 "n_walkers":self.n_walkers,
+                "move_weights":{
+                    "stretch":self.move_weights.stretch,
+                    "de":self.move_weights.de,
+                    "de_snooker":self.move_weights.de_snooker,
+                },
                 "n_processes":self.n_processes,
                 "burn_in":self.burn_in,
                 "production_steps":self.production_steps,
