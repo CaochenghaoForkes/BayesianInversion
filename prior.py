@@ -1,3 +1,5 @@
+from functools import partial
+
 import numpy as np
 from scipy.stats import truncnorm
 
@@ -10,100 +12,169 @@ class Prior:
         """单参数的先验"""
 
         def __init__(
-            self
+            self,
+            prior_config: dict[str,InputCard.Prior.SingleParameterPrior],
         ):
-            self.prior_dict = {
-                'uniform': self._uniform,
-                'normal': self._normal
-            }            
+            self.prior_builder_dict = {
+                "uniform":self._build_uniform,
+                "truncnorm":self._build_truncnorm,
+            }
+            self.parameter_prior_dict = {name:self._build_prior(config) for name,config in prior_config.items()}
 
-        def log_single_parameter_prior(self,prior_type_i:str,theta_i:float,mean_i:float,sigma_i:float,lower_i:float,upper_i:float) -> float:
-            """计算第i个变量的 log 先验"""
+        def _build_prior(
+            self,
+            config: InputCard.Prior.SingleParameterPrior,
+        ):
+            """根据配置构造单参数先验计算函数"""
 
-            if theta_i < lower_i or theta_i > upper_i:
+            if config.type not in self.prior_builder_dict:
+                raise NotImplementedError(f"未实现的先验类型: {config.type}")
+
+            builder = self.prior_builder_dict[config.type]
+            return builder(config)
+
+        def log_single_parameter_prior(
+            self,
+            name: str,
+            theta: float,
+        ) -> float:
+            """计算一个参数的 log 先验"""
+
+            if not np.isfinite(theta):
                 return -np.inf
 
-            if prior_type_i not in self.prior_dict:
-                raise ValueError(f"未知先验类型: {prior_type_i}")
+            calculator = self.parameter_prior_dict[name]
+            return float(calculator(theta))
 
-            prior_calculator = self.prior_dict[prior_type_i]
-            return prior_calculator(theta_i,mean_i,sigma_i,lower_i,upper_i)
+        def _build_uniform(
+            self,
+            config: InputCard.Prior.SingleParameterPrior,
+        ):
+            """构造均匀先验计算函数"""
+
+            return partial(
+                self._uniform,
+                lower=config.lower,
+                upper=config.upper,
+            )
+
+        def _build_truncnorm(
+            self,
+            config: InputCard.Prior.SingleParameterPrior,
+        ):
+            """构造截断正态先验计算函数"""
+
+            mean = config.truncnorm.mean
+            sigma = config.truncnorm.sigma
+            lower_standard = (config.lower-mean)/sigma
+            upper_standard = (config.upper-mean)/sigma
+
+            return partial(
+                self._truncnorm,
+                lower_standard=lower_standard,
+                upper_standard=upper_standard,
+                mean=mean,
+                sigma=sigma,
+            )
 
         @staticmethod
-        def _uniform(theta_i:float,mean_i:float,sigma_i:float,lower_i:float,upper_i:float) -> float:
+        def _uniform(
+            theta: float,
+            *,
+            lower: float,
+            upper: float,
+        ) -> float:
             """均匀分布"""
 
-            log_prior = -np.log(upper_i - lower_i)
+            if theta < lower or theta > upper:
+                return -np.inf
 
-            return log_prior
+            return -np.log(upper-lower)
 
         @staticmethod
-        def _normal(theta_i:float,mean_i:float,sigma_i:float,lower_i:float,upper_i:float) -> float:
+        def _truncnorm(
+            theta: float,
+            *,
+            lower_standard: float,
+            upper_standard: float,
+            mean: float,
+            sigma: float,
+        ) -> float:
             """截断正态分布"""
 
-            lower_standard = (lower_i - mean_i) / sigma_i
-            upper_standard = (upper_i - mean_i) / sigma_i
-            log_prior = truncnorm.logpdf(theta_i,lower_standard,upper_standard,loc=mean_i,scale=sigma_i)
-
-            return log_prior
+            return truncnorm.logpdf(
+                theta,
+                lower_standard,
+                upper_standard,
+                loc=mean,
+                scale=sigma,
+            )
 
     class JointPrior:
         """联合先验"""
 
         def __init__(
-            self
+            self,
+            joint_prior_config: InputCard.Prior.JointPrior,
+            parameter_names: list[str],
+            single_parameter_prior: "Prior.SingleParameterPrior",
         ):
+            self.joint_prior_config = joint_prior_config
+            self.parameter_names = parameter_names
+            self.single_parameter_prior = single_parameter_prior
             self.prior_dict = {
-                'independent': self._independent
+                "independent":self._independent,
             }
 
-        def log_joint_prior(self,log_prior_list,joint_prior_type):
+        def log_joint_prior(
+            self,
+            theta: dict[str,float],
+        ) -> float:
             """计算联合先验"""
 
-            prior_calculator = self.prior_dict[joint_prior_type]
+            prior_type = self.joint_prior_config.type
+            if prior_type not in self.prior_dict:
+                raise NotImplementedError(f"未实现的联合先验: {prior_type}")
 
-            return prior_calculator(log_prior_list)
+            calculator = self.prior_dict[prior_type]
+            return calculator(theta)
 
-        @staticmethod
-        def _independent(log_prior_list:list[float]) -> float:
+        def _independent(
+            self,
+            theta: dict[str,float],
+        ) -> float:
             """参数间相互独立计算联合先验"""
 
-            log_prior = sum(log_prior_list)
+            log_prior = 0.0
+            for name in self.parameter_names:
+                value = self.single_parameter_prior.log_single_parameter_prior(name,theta[name])
+                if not np.isfinite(value):
+                    return -np.inf
+
+                log_prior += value
 
             return log_prior
 
     def __init__(
         self,
-        prior_config: InputCard.Prior
+        prior_config: InputCard.Prior,
+        parameter_names: list[str],
     ):
         # 读入配置
         self.prior_config = prior_config
         self.single_parameter_prior_config = self.prior_config.single_parameter_prior        
         self.joint_prior_config = self.prior_config.joint_prior
-        # 初始化变量
-        self.log_prior_dict = {name:None for name in self.single_parameter_prior_config}
         # 初始化子类对象
-        self.single_parameter_prior_calculator = self.SingleParameterPrior()
-        self.joint_prior_calculator = self.JointPrior()
+        self.single_parameter_prior_calculator = self.SingleParameterPrior(
+            self.single_parameter_prior_config
+        )
+        self.joint_prior_calculator = self.JointPrior(
+            self.joint_prior_config,
+            parameter_names,
+            self.single_parameter_prior_calculator,
+        )
 
     def log_prior(self,theta:dict[str,float]) -> float:
         """计算先验"""
 
-        log_prior_list = []
-
-        for name_i,prior_config in self.single_parameter_prior_config.items():
-            theta_i = theta[name_i]
-            lower_i = prior_config.lower
-            upper_i = prior_config.upper
-            prior_type_i = prior_config.type
-            mean_i = prior_config.normal.mean
-            sigma_i = prior_config.normal.sigma
-
-            log_prior_i = self.single_parameter_prior_calculator.log_single_parameter_prior(prior_type_i,theta_i,mean_i,sigma_i,lower_i,upper_i)
-            log_prior_list.append(log_prior_i)
-            self.log_prior_dict[name_i] = log_prior_i
-
-        joint_prior_type = self.joint_prior_config.type
-        joint_prior = self.joint_prior_calculator.log_joint_prior(log_prior_list,joint_prior_type)
-
-        return joint_prior
+        return self.joint_prior_calculator.log_joint_prior(theta)

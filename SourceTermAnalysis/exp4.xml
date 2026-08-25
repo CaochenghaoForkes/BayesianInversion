@@ -129,7 +129,7 @@
             <Mesh>
                 <ElementMeshNumber value="10 20" />
                 <GraphiteGrainMeshNumber value="10" />
-                <TrisoParticleMeshNumber value="50 50 50 50 50" />
+                <TrisoParticleMeshNumber value="50 30 30 30 30" />
                 <ElementMeshBias value="0.0 0.0" />
                 <GraphiteGrainMeshBias value="0.0" />
                 <TrisoParticleMeshBias value="0.0 0.0 0.0 0.0 0.0" />
@@ -149,18 +149,18 @@
             <FuelPerformanceSolver>
                 <SteadyGasesReleaseFractionMaxIterations value="3000" />
             </FuelPerformanceSolver>
-            <FailureAdjustment mode="on" split_num="10" adjust_time_step_num="10" />
+            <FailureAdjustment mode="off" split_num="10" adjust_time_step_num="10" />
         </Solver>
     </MARS>
     <MARS-MARS>
         <HTRPMFSARMode value="off" />
         <Control>
             <RequiredSimulationTime unit="[h]" value="270" />
-            <RequiredTimeStep unit="[h]" value="0.5" />
+            <RequiredTimeStep unit="[h]" value="1.0" />
             <Output>
                 <OutputPath value="EXP/exp4" />
                 <WriteInterval unit="[s]" value="-1" />
-                <Type value="ReleaseRate Inventory ReleaseCumulant DiffusionCoef" />
+                <Type value="ReleaseRate" />
                 <Distribution value="" time="" />
             </Output>
         </Control>

@@ -1,0 +1,31 @@
+[project]
+name = "bayesian-inversion"
+version = "0.1.0"
+description = "Lightweight Bayesian inversion program for scientific models"
+requires-python = ">=3.10"
+dependencies = [
+    "emcee",
+    "matplotlib",
+    "numpy",
+    "scipy",
+]
+
+[project.scripts]
+bayesian-inversion = "main:main"
+
+[tool.setuptools]
+py-modules = [
+    "main",
+    "config",
+    "data",
+    "prior",
+    "model",
+    "likelihood",
+    "posterior",
+    "sampler",
+    "output",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

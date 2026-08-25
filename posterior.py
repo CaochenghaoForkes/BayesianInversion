@@ -21,7 +21,7 @@ def log_posterior(
     model: Model,
     likelihood: Likelihood,
     procedure_file_label: str
-) -> float: 
+) -> float:
     """后验"""
 
     # 计算先验
@@ -29,8 +29,10 @@ def log_posterior(
     if not np.isfinite(log_prior):
         return -np.inf
     # 计算预测值
-    data_pred_dict = model.model_forward(theta,procedure_file_label)
+    model_result = model.model_forward(theta,procedure_file_label)
     # 计算似然
-    log_likelihood = likelihood.log_likelihood(data_pred_dict)
+    log_likelihood = likelihood.log_likelihood(model_result)
+    if not np.isfinite(log_likelihood):
+        return -np.inf
 
-    return log_prior + log_likelihood
+    return float(log_prior + log_likelihood)

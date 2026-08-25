@@ -1,12 +1,18 @@
 {
-    "case_name": "triso_bayesian_learning",
-    "random_seed": 20260711,
+    "schema_version": "1.0",
+
+    "study": {
+        "name": "triso_bayesian_learning",
+        "description": "TRISO扩散参数的贝叶斯反演"
+    },
+
+    "random_seed": 20260825,
 
     "parameters": [
-        {"name": "log_D_pyc" ,"initial": -3.2},
-        {"name": "log_D_sic" ,"initial": -8.86},
-        {"name": "A_pyc" ,"initial": 222e3},
-        {"name": "A_sic" ,"initial": 125e3}
+        {"name": "log_D_pyc" ,"initial": -3.20066},
+        {"name": "log_D_sic" ,"initial": -8.86009},
+        {"name": "A_pyc" ,"initial": 222000.0},
+        {"name": "A_sic" ,"initial": 125000.0}
     ],
 
     "prior": {
@@ -15,38 +21,38 @@
         },
         "single_parameter_prior": {
             "log_D_pyc": {
-                "lower": -4.2,
-                "upper": -2.2,
-                "type": "normal",
-                "normal" : {
-                    "mean": -3.2,
+                "lower": -4.20066,
+                "upper": -2.20066,
+                "type": "truncnorm",
+                "truncnorm": {
+                    "mean": -3.20066,
                     "sigma": 1.2
                 }
             },
             "log_D_sic": {
-                "lower": -9.86,
-                "upper": -7.86,
-                "type": "normal",
-                "normal" : {
-                    "mean": -8.86,
+                "lower": -9.86009,
+                "upper": -7.86009,
+                "type": "truncnorm",
+                "truncnorm": {
+                    "mean": -8.86009,
                     "sigma": 1.2
                 }
             },
             "A_pyc": {
-                "lower": 200e3,
-                "upper": 240e3,
-                "type": "normal",
-                "normal" : {
-                    "mean": 222e3,
+                "lower": 199800.0,
+                "upper": 244200.0,
+                "type": "truncnorm",
+                "truncnorm": {
+                    "mean": 222000.0,
                     "sigma": 10e3
                 }
             },
             "A_sic": {
-                "lower": 115e3,
-                "upper": 135e3,
-                "type": "normal",
-                "normal" : {
-                    "mean": 125e3,
+                "lower": 112500.0,
+                "upper": 137500.0,
+                "type": "truncnorm",
+                "truncnorm": {
+                    "mean": 125000.0,
                     "sigma": 10e3
                 }
             }
@@ -54,14 +60,45 @@
     },
 
     "data": {
-        "name": ["t1","release1","t2","release2","t3","release3","t4","release4"],
-        "data_source": "SourceTermAnalysis/pseudo_experiment_release.csv",
-        "value": null
+        "datasets": [
+            {
+                "name": "experiment1",
+                "source": {
+                    "type": "csv",
+                    "path": "SourceTermAnalysis/experiment1.csv",
+                    "component_order": ["t1","release1"]
+                }
+            },
+            {
+                "name": "experiment2",
+                "source": {
+                    "type": "csv",
+                    "path": "SourceTermAnalysis/experiment2.csv",
+                    "component_order": ["t2","release2"]
+                }
+            },
+            {
+                "name": "experiment3",
+                "source": {
+                    "type": "csv",
+                    "path": "SourceTermAnalysis/experiment3.csv",
+                    "component_order": ["t3","release3"]
+                }
+            },
+            {
+                "name": "experiment4",
+                "source": {
+                    "type": "csv",
+                    "path": "SourceTermAnalysis/experiment4.csv",
+                    "component_order": ["t4","release4"]
+                }
+            }
+        ]
     },
 
     "likelihood": {
         "joint_likelihood": {
-            "data_order": ["release1","release2","release3","release4"],
+            "data_order": ["experiment1","experiment2","experiment3","experiment4"],
             "distribution": {
                 "type": "normal",
                 "student_t": {
@@ -70,66 +107,80 @@
             },
             "correlation": {
                 "type": "block_matrix",
-                "complete_matrix_source": "correlation_matrix.csv",
+                "complete_matrix": {
+                    "source": "correlation_matrix.csv"
+                },
                 "block_matrix": {
-                    "release1_release2": {
-                        "data_i": "release1",
-                        "data_j": "release2",
+                    "experiment1_experiment2": {
+                        "data_i": "experiment1",
+                        "data_j": "experiment2",
                         "type": "independent",
-                        "complete_matrix_source": "y1_y2_matrix.csv",
-                        "correlation_value": 0.4,
+                        "complete_matrix": {
+                            "source": "y1_y2_matrix.csv"
+                        },
                         "exponential": {
-                            "length_scale": 10.0
+                            "length_scales": [10.0],
+                            "correlation_value": 0.4
                         }
                     },
-                    "release1_release3": {
-                        "data_i": "release1",
-                        "data_j": "release3",
+                    "experiment1_experiment3": {
+                        "data_i": "experiment1",
+                        "data_j": "experiment3",
                         "type": "independent",
-                        "complete_matrix_source": "y1_y2_matrix.csv",
-                        "correlation_value": 0.4,
+                        "complete_matrix": {
+                            "source": "y1_y2_matrix.csv"
+                        },
                         "exponential": {
-                            "length_scale": 10.0
+                            "length_scales": [10.0],
+                            "correlation_value": 0.4
                         }
                     },
-                    "release1_release4": {
-                        "data_i": "release1",
-                        "data_j": "release4",
+                    "experiment1_experiment4": {
+                        "data_i": "experiment1",
+                        "data_j": "experiment4",
                         "type": "independent",
-                        "complete_matrix_source": "y1_y2_matrix.csv",
-                        "correlation_value": 0.4,
+                        "complete_matrix": {
+                            "source": "y1_y2_matrix.csv"
+                        },
                         "exponential": {
-                            "length_scale": 10.0
+                            "length_scales": [10.0],
+                            "correlation_value": 0.4
                         }
                     },
-                    "release2_release3": {
-                        "data_i": "release2",
-                        "data_j": "release3",
+                    "experiment2_experiment3": {
+                        "data_i": "experiment2",
+                        "data_j": "experiment3",
                         "type": "independent",
-                        "complete_matrix_source": "y1_y2_matrix.csv",
-                        "correlation_value": 0.4,
+                        "complete_matrix": {
+                            "source": "y1_y2_matrix.csv"
+                        },
                         "exponential": {
-                            "length_scale": 10.0
+                            "length_scales": [10.0],
+                            "correlation_value": 0.4
                         }
                     },
-                    "release2_release4": {
-                        "data_i": "release2",
-                        "data_j": "release4",
+                    "experiment2_experiment4": {
+                        "data_i": "experiment2",
+                        "data_j": "experiment4",
                         "type": "independent",
-                        "complete_matrix_source": "y1_y2_matrix.csv",
-                        "correlation_value": 0.4,
+                        "complete_matrix": {
+                            "source": "y1_y2_matrix.csv"
+                        },
                         "exponential": {
-                            "length_scale": 10.0
+                            "length_scales": [10.0],
+                            "correlation_value": 0.4
                         }
                     },
-                    "release3_release4": {
-                        "data_i": "release3",
-                        "data_j": "release4",
+                    "experiment3_experiment4": {
+                        "data_i": "experiment3",
+                        "data_j": "experiment4",
                         "type": "independent",
-                        "complete_matrix_source": "y1_y2_matrix.csv",
-                        "correlation_value": 0.4,
+                        "complete_matrix": {
+                            "source": "y1_y2_matrix.csv"
+                        },
                         "exponential": {
-                            "length_scale": 10.0
+                            "length_scales": [10.0],
+                            "correlation_value": 0.4
                         }
                     }
                 }
@@ -137,17 +188,19 @@
         },
         "single_data_likelihood": [
             {   
-                "name": "release1",
-                "coordinate": "t1",
+                "dataset": "experiment1",
+                "value_component": "release1",
+                "coordinate_components": ["t1"],
                 "space": "log10",
-                "epsilon": 1e-100,
                 "point_correlation": {
                     "type": "exponential",
                     "complete_matrix": {
                         "source": "y1_point_correlation.csv"
                     },
                     "exponential": {
-                        "length_scale": 1800
+                        "length_scales": {
+                            "t1": 1800
+                        }
                     }
                 },
                 "sigma_exp": {
@@ -170,17 +223,19 @@
                 }
             },
             {   
-                "name": "release2",
-                "coordinate": "t2",
+                "dataset": "experiment2",
+                "value_component": "release2",
+                "coordinate_components": ["t2"],
                 "space": "log10",
-                "epsilon": 1e-100,
                 "point_correlation": {
                     "type": "exponential",
                     "complete_matrix": {
                         "source": "y1_point_correlation.csv"
                     },
                     "exponential": {
-                        "length_scale": 1800
+                        "length_scales": {
+                            "t2": 1800
+                        }
                     }
                 },
                 "sigma_exp": {
@@ -203,17 +258,19 @@
                 }
             },
             {   
-                "name": "release3",
-                "coordinate": "t3",
+                "dataset": "experiment3",
+                "value_component": "release3",
+                "coordinate_components": ["t3"],
                 "space": "log10",
-                "epsilon": 1e-100,
                 "point_correlation": {
                     "type": "exponential",
                     "complete_matrix": {
                         "source": "y1_point_correlation.csv"
                     },
                     "exponential": {
-                        "length_scale": 1800
+                        "length_scales": {
+                            "t3": 1800
+                        }
                     }
                 },
                 "sigma_exp": {
@@ -236,17 +293,19 @@
                 }
             },
             {   
-                "name": "release4",
-                "coordinate": "t4",
+                "dataset": "experiment4",
+                "value_component": "release4",
+                "coordinate_components": ["t4"],
                 "space": "log10",
-                "epsilon": 1e-100,
                 "point_correlation": {
                     "type": "exponential",
                     "complete_matrix": {
                         "source": "y1_point_correlation.csv"
                     },
                     "exponential": {
-                        "length_scale": 1800
+                        "length_scales": {
+                            "t4": 1800
+                        }
                     }
                 },
                 "sigma_exp": {
@@ -277,32 +336,55 @@
             "work_dir": "SourceTermAnalysis",
             "case_map": {
                 "exp1.xml": {
-                    "time": "t1",
-                    "release_rate": "release1"
+                    "datasets": {
+                        "experiment1": {
+                            "component_map": {
+                                "t1": "time",
+                                "release1": "release_rate"
+                            }
+                        }
+                    }
                 },
                 "exp2.xml": {
-                    "time": "t2",
-                    "release_rate": "release2"
+                    "datasets": {
+                        "experiment2": {
+                            "component_map": {
+                                "t2": "time",
+                                "release2": "release_rate"
+                            }
+                        }
+                    }
                 },
                 "exp3.xml": {
-                    "time": "t3",
-                    "release_rate": "release3"
+                    "datasets": {
+                        "experiment3": {
+                            "component_map": {
+                                "t3": "time",
+                                "release3": "release_rate"
+                            }
+                        }
+                    }
                 },
                 "exp4.xml": {
-                    "time": "t4",
-                    "release_rate": "release4"
+                    "datasets": {
+                        "experiment4": {
+                            "component_map": {
+                                "t4": "time",
+                                "release4": "release_rate"
+                            }
+                        }
+                    }
                 }
             }
         }
     },
 
     "sampler": {
-        "sampler_label": "mcmctest",
         "type": "emcee",
-        "n_walkers": 18,
-        "n_processes": 12,
-        "n_steps": 500,
-        "burn_in": 100,
+        "n_walkers": 12,
+        "n_processes": 6,
+        "burn_in": 2000,
+        "production_steps": 8000,
         "thin": 2,
         "initial_spread": {
             "log_D_pyc": 0.08,
@@ -312,7 +394,11 @@
         }
     },
 
+    "postprocess": {
+        "separate_figures": true
+    },
+
     "output": {
-        "output_dir": "results/triso_bayesian_learning"
+        "directory": "results/triso_bayesian_learning"
     }
 }

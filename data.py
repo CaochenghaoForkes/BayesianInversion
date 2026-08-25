@@ -1,58 +1,128 @@
 import csv
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+import numpy as np
 
 from config import InputCard
 
+@dataclass
+class ObservedData:
+    """已加载的全部观测数据"""
+
+    names: list[str]
+    values: dict[str,np.ndarray]
+    metadata: dict[str,Any] = field(default_factory=dict)
+
+    def component(
+        self,
+        data_name: str,
+        component_name: str,
+    ) -> np.ndarray:
+        """按名称提取一个数据分量"""
+
+        source_metadata = self.metadata["sources"][data_name]
+        component_index = source_metadata["component_index"]
+        if component_name not in component_index:
+            raise KeyError(
+                f"观测数据 {data_name} 不包含分量 {component_name}"
+            )
+
+        return self.values[data_name][:,component_index[component_name]]
+
 class Data:
-    """观测数据"""
+    """观测数据加载器"""
 
     def __init__(
         self,
         data_config: InputCard.Data
     ):
-        # 读入配置
         self.data_config = data_config
-        self.name = self.data_config.name
-        self.value = self.data_config.value
-        self.data_source = self.data_config.data_source
-        # 初始化
-        self.extract_dict = {
-            'csv':self._extract_data_from_csv,
-            'json':self._extract_data_from_raw_json
+
+    def load(self) -> ObservedData:
+        """加载并检查全部观测数据"""
+
+        values = {}
+        for dataset in self.data_config.datasets:
+            values[dataset.name] = self._read_csv(dataset)
+
+        names = [dataset.name for dataset in self.data_config.datasets]
+        metadata = {
+            "sources": {
+                dataset.name: self._source_metadata(dataset,values[dataset.name])
+                for dataset in self.data_config.datasets
+            }
         }
-        self.data_dict = self._extract_data()
 
-    def _extract_data(self) -> dict[str,list[float]]:
-        """提取观测数据"""
-
-        if self.data_source == "json":
-            mode = "json"
-        else:
-            mode = "csv"
-
-        data_dict = self.extract_dict[mode](self.data_source,self.name,self.value)
-
-        return data_dict
+        return ObservedData(
+            names=names,
+            values=values,
+            metadata=metadata,
+        )
 
     @staticmethod
-    def _extract_data_from_csv(data_source:str,names:list[str],value:list[list[float]]) -> dict[str,list[float]]:
-        """从csv提取数据"""
+    def _read_csv(
+        dataset: InputCard.Data.Dataset,
+    ) -> np.ndarray:
+        """读取一个 dataset 对应的 CSV 分量"""
 
-        data_dict = {name: [] for name in names}
-        with Path(data_source).open("r", encoding="utf-8-sig", newline="") as file:
+        path = dataset.source.path
+        component_order = dataset.source.component_order
+        raw_columns = {component: [] for component in component_order}
+
+        with Path(path).open("r",encoding="utf-8-sig",newline="") as file:
             reader = csv.DictReader(file)
-            for row in reader:
-                for name in names:
-                    data_dict[name].append(float(row[name]))
+            fieldnames = set(reader.fieldnames or [])
+            missing_columns = set(component_order) - fieldnames
+            if missing_columns:
+                raise ValueError(
+                    f"CSV {path} 缺少数据列: {sorted(missing_columns)}"
+                )
 
-        return data_dict
+            for row_number,row in enumerate(reader,start=2):
+                for column in component_order:
+                    raw_value = row[column]
+                    if raw_value is None or not raw_value.strip():
+                        raise ValueError(
+                            f"CSV {path} 第 {row_number} 行的 {column} 为空"
+                        )
+                    raw_columns[column].append(raw_value)
+
+        columns = [Data._validate_values(component,raw_columns[component]) for component in component_order]
+        matrix = np.column_stack(columns)
+
+        return Data._validate_values(dataset.name,matrix)
 
     @staticmethod
-    def _extract_data_from_raw_json(data_source:str,names:list[str],values:list[list[float]]) -> dict[str,list[float]]:
-        """从原始json中提取数据"""
+    def _validate_values(name: str,values: Any) -> np.ndarray:
+        """统一转换并检查任意维数的数值数据"""
 
-        data_dict = {}
-        for name,value in zip(names,values):
-            data_dict[name] = value.copy()
+        try:
+            array = np.asarray(values,dtype=np.float64)
+        except (TypeError,ValueError) as error:
+            raise ValueError(f"观测数据 {name} 不能转换为浮点数") from error
 
-        return data_dict
+        if array.size == 0:
+            raise ValueError(f"观测数据 {name} 不能为空")
+        if not np.all(np.isfinite(array)):
+            raise ValueError(f"观测数据 {name} 包含非有限数值")
+
+        return array.copy()
+
+    @staticmethod
+    def _source_metadata(
+        dataset: InputCard.Data.Dataset,
+        values: np.ndarray,
+    ) -> dict[str,Any]:
+        """生成单个观测数据的来源元数据"""
+
+        source = dataset.source
+        component_order = source.component_order
+        return {
+            "type":source.type,
+            "path":source.path,
+            "component_order":component_order.copy(),
+            "component_index":{name:index for index,name in enumerate(component_order)},
+            "shape":values.shape,
+            "dtype":str(values.dtype),
+        }
