@@ -590,23 +590,30 @@ class Plotter:
                 else {}
             )
 
-        def _register_parameter_line_styles(
+        def _curve_line_styles(
             self,
             parameter_names: list[str],
+            colors: dict[str,str],
         ) -> dict[str,Any]:
-            """为参数登记固定线型"""
+            """同一种颜色再次出现时才启用下一种线型"""
 
+            color_counts = {}
+            line_styles = {}
             for parameter_name in parameter_names:
-                if parameter_name in self.parameter_line_styles:
-                    continue
+                color = colors[parameter_name]
+                style_index = color_counts.get(color,0)
+                color_counts[color] = style_index+1
+                line_styles[parameter_name] = self.LINE_STYLES[
+                    style_index % len(self.LINE_STYLES)
+                ]
 
-                style_index = len(self.parameter_line_styles) % len(self.LINE_STYLES)
-                self.parameter_line_styles[parameter_name] = self.LINE_STYLES[style_index]
+            line_styles.update({
+                name:style
+                for name,style in self.parameter_line_styles.items()
+                if name in line_styles
+            })
 
-            return {
-                name: self.parameter_line_styles[name]
-                for name in parameter_names
-            }
+            return line_styles
 
         def plot(
             self,
@@ -696,7 +703,10 @@ class Plotter:
 
             parameter_names = list(series_values)
             curve_colors = self._register_parameter_colors(parameter_names)
-            curve_line_styles = self._register_parameter_line_styles(parameter_names)
+            curve_line_styles = self._curve_line_styles(
+                parameter_names,
+                curve_colors,
+            )
 
             if colors is not None:
                 unknown_names = set(colors) - set(parameter_names)
@@ -1657,6 +1667,9 @@ class Plotter:
     class PairScatterPlotter(BasePlotter):
         """后验参数两两散点图"""
 
+        SCATTER_COLOR = "#707070"
+        SCATTER_ALPHA = 0.35
+
         def plot(
             self,
             samples: np.ndarray,
@@ -1690,7 +1703,6 @@ class Plotter:
                 )
                 plot_values = values[indices]
 
-            colors = self._register_parameter_colors(parameter_names)
             correlation = np.corrcoef(values,rowvar=False)
             figure_size = figsize or self.style.default_figsize
             output_paths = {}
@@ -1704,7 +1716,7 @@ class Plotter:
                         coefficient_label = (
                             rf"Pearson $\rho={coefficient:.3f}$"
                             if np.isfinite(coefficient)
-                            else rf"Pearson $\rho=\mathrm{{NaN}}$"
+                            else r"Pearson $\rho=\mathrm{NaN}$"
                         )
 
                         figure,axis = self._create_figure(
@@ -1714,8 +1726,8 @@ class Plotter:
                             plot_values[:,first],
                             plot_values[:,second],
                             s=10.0,
-                            color=colors[second_name],
-                            alpha=0.28,
+                            color=self.SCATTER_COLOR,
+                            alpha=self.SCATTER_ALPHA,
                             edgecolors="none",
                             rasterized=True,
                         )

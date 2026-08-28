@@ -14,6 +14,12 @@ class InputCard:
     """输入配置"""
 
     @dataclass
+    class Workflow:
+        """程序运行方式"""
+
+        mode: str = "ask"  # [ask, run, postprocess]
+
+    @dataclass
     class Study:
         """研究任务元数据"""
 
@@ -35,7 +41,7 @@ class InputCard:
         class JointPrior:
             """联合先验配置"""
 
-            type: str = "independent"
+            type: str = "independent"  # [independent]
 
         @dataclass
         class SingleParameterPrior:
@@ -50,7 +56,7 @@ class InputCard:
 
             lower: float
             upper: float
-            type: str = "uniform"
+            type: str = "uniform"  # [uniform, truncnorm]
             truncnorm: Truncnorm = field(default_factory=Truncnorm)
 
         joint_prior: JointPrior = field(default_factory=JointPrior)
@@ -66,14 +72,14 @@ class InputCard:
 
             path: str | None
             component_order: list[str]
-            type: str = "csv"
+            type: str = "csv"  # [csv]
 
         @dataclass
         class Dataset:
             """单个命名观测数据配置"""
 
             name: str
-            source: Source
+            source: "InputCard.Data.Source"
 
         datasets: list[Dataset] = field(default_factory=list)
 
@@ -95,7 +101,7 @@ class InputCard:
 
                     degrees_of_freedom: float = 5.0
 
-                type: str = "normal"
+                type: str = "normal"  # [normal, student_t]
                 student_t: StudentT = field(default_factory=StudentT)
 
             @dataclass
@@ -129,7 +135,7 @@ class InputCard:
 
                     data_i: str
                     data_j: str
-                    type: str = "independent"
+                    type: str = "independent"  # [independent, complete_matrix, exponential]
                     complete_matrix: CompleteMatrix = field(
                         default_factory=CompleteMatrix
                     )
@@ -137,7 +143,7 @@ class InputCard:
                         default_factory=Exponential
                     )
 
-                type: str = "block_matrix"
+                type: str = "block_matrix"  # [complete_matrix, block_matrix]
                 complete_matrix: CompleteMatrix = field(
                     default_factory=CompleteMatrix
                 )
@@ -171,7 +177,7 @@ class InputCard:
                         default_factory=dict
                     )
 
-                type: str = "independent"
+                type: str = "independent"  # [independent, complete_matrix, exponential]
                 complete_matrix: CompleteMatrix = field(default_factory=CompleteMatrix)
                 exponential: Exponential = field(
                     default_factory=Exponential
@@ -193,14 +199,14 @@ class InputCard:
 
                     value: float | None = None
 
-                type: str = "relative"
+                type: str = "relative"  # [relative, absolute]
                 absolute: Absolute = field(default_factory=Absolute)
                 relative: Relative = field(default_factory=Relative)
 
             dataset: str
             value_component: str
             coordinate_components: list[str] = field(default_factory=list)
-            space: str = "linear"
+            space: str = "linear"  # [linear, log10]
             point_correlation: PointCorrelation = field(
                 default_factory=PointCorrelation
             )
@@ -228,12 +234,14 @@ class InputCard:
             class Case:
                 """一个MARS XML算例及其输出数据集"""
 
-                datasets: dict[str,Dataset] = field(default_factory=dict)
+                datasets: dict[str,"InputCard.Model.Mars.Dataset"] = field(
+                    default_factory=dict
+                )
 
             work_dir: str | None = None
             case_map: dict[str,Case] = field(default_factory=dict)
 
-        type: str = "mars"
+        type: str = "mars"  # [mars]
         mars: Mars = field(default_factory=Mars)
 
     @dataclass
@@ -260,7 +268,7 @@ class InputCard:
         burn_in: int
         thin: int
         initial_spread: dict[str,float]
-        type: str = "emcee"
+        type: str = "emcee"  # [emcee]
         emcee: Emcee | None = None
 
     @dataclass
@@ -275,7 +283,7 @@ class InputCard:
 
         separate_figures: bool = False
 
-    schema_version: str
+    schema_version: str  # [1.0]
     study: Study
     random_seed: int
     parameters: list[Parameter]
@@ -285,6 +293,7 @@ class InputCard:
     model: Model
     sampler: Sampler
     output: Output
+    workflow: Workflow = field(default_factory=Workflow)
     postprocess: Postprocess = field(default_factory=Postprocess)
 
 
@@ -304,12 +313,22 @@ class Examine:
         if input_card.random_seed < 0:
             raise ValueError("random_seed 不能为负数")
 
+        Examine._workflow(input_card.workflow)
         Examine._parameters(input_card)
         Examine._prior(input_card)
         Examine._data_and_likelihood(input_card)
         Examine._model(input_card)
         Examine._sampler(input_card)
         Examine._postprocess(input_card)
+
+    @staticmethod
+    def _workflow(config: InputCard.Workflow) -> None:
+        """检查程序运行方式"""
+
+        if config.mode not in {"ask","run","postprocess"}:
+            raise ValueError(
+                "workflow.mode 只支持 ask、run 或 postprocess"
+            )
 
     @staticmethod
     def _parameters(input_card: InputCard) -> None:
@@ -688,8 +707,8 @@ class Examine:
             raise ValueError("emcee move_weights 至少应有一个正权重")
         if sampler.n_processes < 1:
             raise ValueError("n_processes 必须大于或等于 1")
-        if sampler.burn_in < 1:
-            raise ValueError("burn_in 必须大于 0")
+        if sampler.burn_in < 0:
+            raise ValueError("burn_in 必须大于或等于 0")
         if sampler.production_steps < 1:
             raise ValueError("production_steps 必须大于 0")
         if sampler.thin < 1:
@@ -741,6 +760,7 @@ class JsonReader:
 
         input_card = InputCard(
             schema_version=data.get("schema_version", "1.0"),
+            workflow=InputCard.Workflow(**data.get("workflow", {})),
             study=study,
             random_seed=random_seed,
             parameters=cls.read_parameters(data.get("parameters", [])),

@@ -1,7 +1,9 @@
 """Write Bayesian-inversion samples and diagnostics to result files."""
 
 import csv
+import json
 from collections.abc import Iterable
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +20,7 @@ class Output:
     COLUMN_SEPARATOR = "\t"
 
     def __init__(self,input_card: InputCard):
+        self.input_card = input_card
         self.study_name = input_card.study.name
         self.parameter_names = [
             parameter.name
@@ -106,6 +109,7 @@ class Output:
         self.output_directory.mkdir(parents=True,exist_ok=True)
 
         paths = {
+            "resolved_input_card":self._write_resolved_input_card(),
             "summary": self._write_summary(result),
             "samples": self._save_samples(
                 result.parameter_names,
@@ -127,6 +131,19 @@ class Output:
         }
 
         return paths
+
+    def _write_resolved_input_card(self) -> Path:
+        """保存已补全缺省值和绝对路径的输入卡"""
+
+        path = self.output_directory/"resolved_input_card.json"
+        text = json.dumps(
+            asdict(self.input_card),
+            ensure_ascii=False,
+            indent=2,
+        )
+        path.write_text(text+"\n",encoding="utf-8")
+
+        return path
 
     def _validate_result(self,result: SamplerResult) -> None:
         """检查采样结果各数组的形状与对应关系"""

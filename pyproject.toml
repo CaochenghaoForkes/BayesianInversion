@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "bayesian-inversion"
 version = "0.1.0"
@@ -7,6 +11,7 @@ dependencies = [
     "emcee",
     "matplotlib",
     "numpy",
+    "pillow",
     "scipy",
 ]
 
@@ -24,6 +29,7 @@ py-modules = [
     "posterior",
     "sampler",
     "output",
+    "postprocess",
 ]
 
 [tool.ruff]

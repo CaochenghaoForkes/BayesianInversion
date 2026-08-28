@@ -1,6 +1,10 @@
 {
     "schema_version": "1.0",
 
+    "workflow": {
+        "mode": "ask"
+    },
+
     "study": {
         "name": "triso_bayesian_learning",
         "description": "TRISO扩散参数的贝叶斯反演"

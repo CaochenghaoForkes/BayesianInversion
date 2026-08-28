@@ -1,6 +1,7 @@
 """Run the complete Bayesian-inversion workflow."""
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -9,13 +10,21 @@ from data import Data
 from likelihood import Likelihood
 from model import Model
 from output import Output
-from postprocess import PostProcessor
+from postprocess import PostProcessor,Postprocess
 from posterior import PosteriorCalculator
 from prior import Prior
 from sampler import Sampler
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
+
+
+@dataclass(frozen=True)
+class WorkflowPlan:
+    """解析后的程序运行计划"""
+
+    run_inversion: bool
+    run_postprocess: bool
 
 
 def load_input_card(input_path: str | Path) -> InputCard:
@@ -59,16 +68,22 @@ def run_postprocess(input_card: InputCard) -> dict[str,Any]:
     ).run()
 
 
-def output_directory_available(input_card: InputCard) -> bool:
-    """检查输出目录是否不存在或为空"""
+def output_directory_state(input_card: InputCard) -> str:
+    """识别输出目录为空、包含完整结果或被其他文件占用"""
 
     directory = Path(input_card.output.directory)
     if not directory.exists():
-        return True
+        return "available"
     if not directory.is_dir():
         raise NotADirectoryError(f"输出路径不是目录: {directory}")
+    if not any(directory.iterdir()):
+        return "available"
 
-    return not any(directory.iterdir())
+    try:
+        Postprocess.ResultRepository(directory).load()
+        return "complete"
+    except (FileNotFoundError,ValueError):
+        return "occupied"
 
 
 def next_output_directory(directory: Path) -> Path:
@@ -94,8 +109,8 @@ def prompt_choice(prompt: str,choices: set[str]) -> str:
             choice = input(prompt).strip()
         except EOFError as error:
             raise RuntimeError(
-                "当前环境不能进行交互，请先在JSON中 "
-                "修改 output.directory"
+                "当前环境不能进行交互，请在JSON中将 "
+                "workflow.mode 设为 run 或 postprocess"
             ) from error
 
         if choice in choices:
@@ -134,27 +149,60 @@ def prompt_new_output_directory(current_directory: Path) -> Path:
         print(f"目录已被占用，请重新输入: {candidate}")
 
 
-def resolve_workflow(input_card: InputCard) -> str:
-    """确定重新反演、直接后处理或取消"""
+def resolve_workflow(input_card: InputCard) -> WorkflowPlan:
+    """根据运行模式和输出目录状态确定完整工作流"""
 
-    if output_directory_available(input_card):
-        return "run"
-
+    mode = input_card.workflow.mode.lower()
+    state = output_directory_state(input_card)
     directory = Path(input_card.output.directory)
-    print(f"\n输出目录已包含文件: {directory}")
-    print("[1] 使用新目录重新运行贝叶斯反演并后处理")
-    print("[2] 跳过反演，直接后处理已有结果")
-    print("[3] 取消")
-    choice = prompt_choice("请选择: ",{"1","2","3"})
+
+    if mode == "run":
+        if state != "available":
+            raise FileExistsError(
+                f"输出目录已被占用: {directory}; "
+                "请修改 output.directory 或使用 ask 模式"
+            )
+        return WorkflowPlan(True,True)
+
+    if mode == "postprocess":
+        if state != "complete":
+            raise FileNotFoundError(
+                f"后处理模式需要完整的已有结果: {directory}"
+            )
+        return WorkflowPlan(False,True)
+
+    if state == "available":
+        return WorkflowPlan(True,True)
+
+    if state == "complete":
+        print(f"\n输出目录中已存在贝叶斯反演结果: {directory}")
+        print("[1] 使用新目录重新运行反演并后处理")
+        print("[2] 跳过反演，直接后处理已有结果")
+        print("[3] 取消")
+        choice = prompt_choice("请选择: ",{"1","2","3"})
+
+        if choice == "2":
+            return WorkflowPlan(False,True)
+        if choice == "3":
+            return WorkflowPlan(False,False)
+
+        input_card.output.directory = str(
+            prompt_new_output_directory(directory)
+        )
+        return WorkflowPlan(True,True)
+
+    print(f"\n输出目录非空，但没有发现完整反演结果: {directory}")
+    print("[1] 使用新目录重新运行反演并后处理")
+    print("[2] 取消")
+    choice = prompt_choice("请选择: ",{"1","2"})
 
     if choice == "2":
-        return "postprocess"
-    if choice == "3":
-        return "cancel"
+        return WorkflowPlan(False,False)
 
-    new_directory = prompt_new_output_directory(directory)
-    input_card.output.directory = str(new_directory)
-    return "run"
+    input_card.output.directory = str(
+        prompt_new_output_directory(directory)
+    )
+    return WorkflowPlan(True,True)
 
 
 def print_paths(paths: Any,prefix: str = "") -> None:
@@ -178,7 +226,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         prog="bayesian-inversion",
-        description="Run a Bayesian parameter inversion.",
+        description="Run or postprocess a Bayesian parameter inversion.",
     )
     parser.add_argument(
         "--config",
@@ -190,21 +238,22 @@ def main() -> None:
 
     input_card = load_input_card(args.config)
     workflow = resolve_workflow(input_card)
-    if workflow == "cancel":
+    if not workflow.run_inversion and not workflow.run_postprocess:
         print("已取消。")
         return
 
-    if workflow == "run":
+    if workflow.run_inversion:
         print("\n开始贝叶斯参数反演。")
         print(f"随机种子: {input_card.random_seed}")
         output_paths = run_inversion(input_card)
         print("\n贝叶斯参数反演完成。")
         print_paths(output_paths,"inversion")
 
-    print("\n开始贝叶斯结果后处理。")
-    figure_paths = run_postprocess(input_card)
-    print("贝叶斯结果后处理完成。")
-    print_paths(figure_paths,"postprocess")
+    if workflow.run_postprocess:
+        print("\n开始贝叶斯结果后处理。")
+        figure_paths = run_postprocess(input_card)
+        print("\n贝叶斯结果后处理完成。")
+        print_paths(figure_paths,"postprocess")
 
 
 if __name__ == "__main__":
