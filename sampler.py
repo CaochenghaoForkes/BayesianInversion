@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from dataclasses import dataclass,field
-from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor
 from typing import TYPE_CHECKING,Any
 from uuid import uuid4
 import numpy as np
@@ -162,11 +162,13 @@ class EmceeSampler:
             sampler = self._create_sampler(parameter_names,posterior,pool=None)
             return self._run(sampler,parameter_names,initial_state,random_state)
 
-        with Pool(
-            self.n_processes,
+        # 一个进程池覆盖 burn-in 与正式采样；worker 异常退出时向主进程报错。
+        pool = ProcessPoolExecutor(
+            max_workers=self.n_processes,
             initializer=_initialize_worker,
             initargs=(posterior,self.study_name),
-        ) as pool:
+        )
+        try:
             sampler = self._create_sampler(
                 parameter_names,
                 posterior=None,
@@ -178,6 +180,8 @@ class EmceeSampler:
                 initial_state,
                 random_state,
             )
+        finally:
+            pool.shutdown(wait=True,cancel_futures=True)
 
         return result
 
