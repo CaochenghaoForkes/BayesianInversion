@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+import math
 
 import numpy as np
 from scipy.optimize import brentq
@@ -222,15 +223,57 @@ class ThreeLayerSphericalShellSolver:
     def _characteristic(self,omega: float) -> float:
         """Evaluate the outer Robin-boundary characteristic equation."""
 
-        matrix = np.eye(2)
+        # 原始完整传递矩阵实现（保留供数值对比）：
+        # matrix = np.eye(2)
+        # for layer in range(3):
+        #     matrix = self._layer_matrix(
+        #         omega,
+        #         self.diffusivities[layer],
+        #         self.interfaces[layer],
+        #         self.interfaces[layer+1],
+        #     )@matrix
+        # return float(matrix[1,1]+self.beta*matrix[0,1])
+
+        phi = 0.0
+        diffusive_flux = 1.0
         for layer in range(3):
-            matrix = self._layer_matrix(
-                omega,
-                self.diffusivities[layer],
-                self.interfaces[layer],
-                self.interfaces[layer+1],
-            )@matrix
-        return float(matrix[1,1]+self.beta*matrix[0,1])
+            diffusivity = float(self.diffusivities[layer])
+            radius_left = float(self.interfaces[layer])
+            radius_right = float(self.interfaces[layer+1])
+            distance = radius_right-radius_left
+            wave_number = omega/math.sqrt(diffusivity)
+            phase = wave_number*distance
+            cosine = math.cos(phase)
+            sine = math.sin(phase)
+            if abs(phase) < 1.0e-4:
+                phase_squared = phase*phase
+                sine_over_wave_number = distance*(
+                    1.0-phase_squared/6.0
+                    +phase_squared*phase_squared/120.0
+                )
+            else:
+                sine_over_wave_number = sine/wave_number
+
+            m11 = (
+                radius_left*cosine+sine_over_wave_number
+            )/radius_right
+            m12 = (
+                radius_left*sine_over_wave_number
+                /(diffusivity*radius_right)
+            )
+            m21 = diffusivity/radius_right**2*(
+                distance*cosine-sine_over_wave_number
+                -radius_left*radius_right*wave_number*sine
+            )
+            m22 = radius_left/radius_right*(
+                cosine-sine_over_wave_number/radius_right
+            )
+            phi,diffusive_flux = (
+                m11*phi+m12*diffusive_flux,
+                m21*phi+m22*diffusive_flux,
+            )
+
+        return diffusive_flux+self.beta*phi
 
     def _characteristic_values(self,omegas: np.ndarray) -> np.ndarray:
         """Evaluate the characteristic equation on an omega grid."""
