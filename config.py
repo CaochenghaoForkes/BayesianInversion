@@ -241,8 +241,23 @@ class InputCard:
             work_dir: str | None = None
             case_map: dict[str,Case] = field(default_factory=dict)
 
-        type: str = "mars"  # [mars]
+        @dataclass
+        class ThreeLayerSphericalShell:
+            """轻量三层球壳半解析模型配置"""
+
+            @dataclass
+            class Dataset:
+                """一个恒温实验产生的命名预测数据集"""
+
+                temperature: float
+                component_map: dict[str,str] = field(default_factory=dict)
+
+            times: list[float] = field(default_factory=list)
+            datasets: dict[str,Dataset] = field(default_factory=dict)
+
+        type: str = "mars"  # [mars, three_layer_spherical_shell]
         mars: Mars = field(default_factory=Mars)
+        three_layer_spherical_shell: ThreeLayerSphericalShell | None = None
 
     @dataclass
     class Sampler:
@@ -608,8 +623,77 @@ class Examine:
     def _model(input_card: InputCard) -> None:
         """检查当前启用的正演模型"""
 
+        if input_card.model.type == "three_layer_spherical_shell":
+            config = input_card.model.three_layer_spherical_shell
+            if config is None:
+                raise ValueError("model.three_layer_spherical_shell 不能为空")
+
+            times = config.times
+            if (
+                not times
+                or any(not isinstance(value,(int,float)) for value in times)
+                or any(not math.isfinite(float(value)) or value < 0.0 for value in times)
+                or any(right <= left for left,right in zip(times[:-1],times[1:]))
+            ):
+                raise ValueError(
+                    "three_layer_spherical_shell.times "
+                    "必须是严格递增的非负有限数值"
+                )
+            if not config.datasets:
+                raise ValueError(
+                    "three_layer_spherical_shell.datasets 不能为空"
+                )
+
+            observed_components = {
+                dataset.name:set(dataset.source.component_order)
+                for dataset in input_card.data.datasets
+            }
+            available_raw_outputs = {"time","release_rate"}
+            for dataset_name,dataset in config.datasets.items():
+                if dataset_name not in observed_components:
+                    raise ValueError(
+                        "三层球壳模型引用了不存在的观测数据集: "
+                        f"{dataset_name}"
+                    )
+                if (
+                    not isinstance(dataset.temperature,(int,float))
+                    or not math.isfinite(float(dataset.temperature))
+                    or dataset.temperature <= 0.0
+                ):
+                    raise ValueError(
+                        f"数据集 {dataset_name} 的 temperature "
+                        "必须是以 K 为单位的有限正数"
+                    )
+                if set(dataset.component_map) != observed_components[dataset_name]:
+                    raise ValueError(
+                        f"数据集 {dataset_name} 的 component_map "
+                        "与观测数据分量不一致"
+                    )
+                unknown_outputs = (
+                    set(dataset.component_map.values())-available_raw_outputs
+                )
+                if unknown_outputs:
+                    raise ValueError(
+                        "三层球壳 component_map 包含未知原始输出: "
+                        f"{sorted(unknown_outputs)}"
+                    )
+
+            required_data = {
+                config.dataset
+                for config in input_card.likelihood.single_data_likelihood
+            }
+            missing = required_data-set(config.datasets)
+            if missing:
+                raise ValueError(
+                    "three_layer_spherical_shell.datasets "
+                    f"缺少预测数据映射: {sorted(missing)}"
+                )
+            return
+
         if input_card.model.type != "mars":
-            raise NotImplementedError(f"未实现的模型类型: {input_card.model.type}")
+            raise NotImplementedError(
+                f"未实现的模型类型: {input_card.model.type}"
+            )
         mars = input_card.model.mars
         if mars.work_dir is None:
             raise ValueError("model.mars.work_dir 不能为 null")
@@ -999,7 +1083,68 @@ class JsonReader:
         )
 
     @staticmethod
+    def _analytical_model_config(
+        data: dict[str,Any],
+        label: str,
+    ) -> dict[str,Any]:
+        """将可选的等间距 time_grid 展开为显式 times。"""
+
+        result = data.copy()
+        grid = result.pop("time_grid",None)
+        if grid is None:
+            return result
+        if result.get("times"):
+            raise ValueError(
+                f"model.{label} 不能同时指定 times 和 time_grid"
+            )
+        if not isinstance(grid,dict):
+            raise TypeError(f"model.{label}.time_grid 必须是对象")
+        required = {"start","stop","step"}
+        if set(grid) != required:
+            raise ValueError(
+                f"model.{label}.time_grid 必须且只能包含 "
+                f"{sorted(required)}"
+            )
+
+        values = {}
+        for name in required:
+            value = grid[name]
+            if not isinstance(value,(int,float)):
+                raise TypeError(
+                    f"model.{label}.time_grid.{name} 必须是数值"
+                )
+            value = float(value)
+            if not math.isfinite(value):
+                raise ValueError(
+                    f"model.{label}.time_grid.{name} 必须是有限数"
+                )
+            values[name] = value
+
+        start,stop,step = (
+            values["start"],values["stop"],values["step"]
+        )
+        if start < 0.0 or stop < start or step <= 0.0:
+            raise ValueError(
+                f"model.{label}.time_grid 必须满足 "
+                "0 <= start <= stop 且 step > 0"
+            )
+        interval_count = (stop-start)/step
+        rounded_count = round(interval_count)
+        if not math.isclose(
+            interval_count,rounded_count,rel_tol=1.0e-10,abs_tol=1.0e-10
+        ):
+            raise ValueError(
+                f"model.{label}.time_grid 必须使 "
+                "(stop-start)/step 为整数"
+            )
+        result["times"] = [
+            start+index*step for index in range(rounded_count+1)
+        ]
+        return result
+
+    @classmethod
     def read_model(
+        cls,
         data: dict[str,Any],
         base_directory: Path,
     ) -> InputCard.Model:
@@ -1018,6 +1163,19 @@ class JsonReader:
                 datasets=datasets
             )
 
+        analytical_data = cls._analytical_model_config(
+            data.get("three_layer_spherical_shell", {}),
+            "three_layer_spherical_shell",
+        )
+        analytical_type = InputCard.Model.ThreeLayerSphericalShell
+        analytical_datasets = {
+            name:analytical_type.Dataset(
+                temperature=dataset["temperature"],
+                component_map=dataset.get("component_map", {}),
+            )
+            for name,dataset in analytical_data.get("datasets", {}).items()
+        }
+
         return InputCard.Model(
             type=data.get("type", "mars"),
             mars=InputCard.Model.Mars(
@@ -1025,6 +1183,10 @@ class JsonReader:
                     mars_data.get("work_dir"),base_directory
                 ),
                 case_map=case_map,
+            ),
+            three_layer_spherical_shell=analytical_type(
+                times=analytical_data.get("times", []),
+                datasets=analytical_datasets,
             ),
         )
 

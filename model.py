@@ -1,4 +1,4 @@
-"""Execute MARS models and assemble named prediction datasets."""
+"""Execute configured forward models and assemble named prediction datasets."""
 
 from __future__ import annotations
 
@@ -12,6 +12,10 @@ import xml.etree.ElementTree as ET
 import numpy as np
 
 from config import InputCard
+from three_layer_spherical_shell import (
+    ThreeLayerSphericalShellSolver as _ThreeLayerSphericalShellSolver,
+    arrhenius_diffusivity as _arrhenius_diffusivity,
+)
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -301,6 +305,159 @@ class Model:
 
             return Model._assemble_result(raw_results,self.case_map)
 
+    class ThreeLayerSphericalShell:
+        """调用轻量三层球壳半解析模型计算多组恒温释放实验"""
+
+        model_name = "three_layer_spherical_shell"
+
+        def __init__(
+            self,
+            parameter_names: list[str],
+            config: InputCard.Model.ThreeLayerSphericalShell,
+        ):
+            self.parameter_names = parameter_names
+            self.times = np.asarray(config.times,dtype=np.float64)
+            self.datasets = config.datasets
+
+            if len(self.parameter_names) != 4:
+                raise ValueError(
+                    "三层球壳模型必须且只能接收四个扩散参数，"
+                    f"当前为 {self.parameter_names}"
+                )
+            self._diffusion_parameters({name:1.0 for name in self.parameter_names})
+
+        @staticmethod
+        def _matching_inputs(
+            inputs: dict[str,float],
+            aliases: set[str],
+        ) -> list[tuple[str,float]]:
+            """按不区分大小写的别名查找输入"""
+
+            return [
+                (name,float(value))
+                for name,value in inputs.items()
+                if name.lower() in aliases
+            ]
+
+        @classmethod
+        def _required_input(
+            cls,
+            inputs: dict[str,float],
+            physical_name: str,
+            aliases: set[str],
+        ) -> float:
+            """读取一个必须且只能出现一次的物理输入"""
+
+            matches = cls._matching_inputs(inputs,aliases)
+            if not matches:
+                raise ValueError(
+                    f"{cls.model_name} 缺少输入参数: {physical_name}"
+                )
+            if len(matches) > 1:
+                raise ValueError(
+                    f"{cls.model_name} 的 {physical_name} 输入重复: "
+                    f"{[name for name,_ in matches]}"
+                )
+            return matches[0][1]
+
+        @classmethod
+        def _pre_exponential(
+            cls,
+            inputs: dict[str,float],
+            material: str,
+        ) -> float:
+            """读取 D0 名称含 log 的输入按以 10 为底的对数还原。"""
+
+            material = material.lower()
+            direct = cls._matching_inputs(
+                inputs,{f"d0_{material}",f"d_{material}"}
+            )
+            logarithmic = cls._matching_inputs(
+                inputs,
+                {
+                    f"log_d0_{material}",f"log_d_{material}",
+                    f"d0_log_{material}",f"d_log_{material}",
+                },
+            )
+            matches = [*direct,*logarithmic]
+            if not matches:
+                raise ValueError(
+                    f"{cls.model_name} 缺少 D0_{material} 输入"
+                )
+            if len(matches) > 1:
+                raise ValueError(
+                    f"{cls.model_name} 的 D0_{material} 输入重复: "
+                    f"{[name for name,_ in matches]}"
+                )
+            if logarithmic:
+                return float(10.0**logarithmic[0][1])
+            return direct[0][1]
+
+        @classmethod
+        def _diffusion_parameters(
+            cls,
+            inputs: dict[str,float],
+        ) -> tuple[float,float,float,float]:
+            """按 PyC D0、PyC A、SiC D0、SiC A 的顺序读取参数。"""
+
+            return (
+                cls._pre_exponential(inputs,"pyc"),
+                cls._required_input(inputs,"A_PyC",{"a_pyc","activation_energy_pyc"}),
+                cls._pre_exponential(inputs,"sic"),
+                cls._required_input(inputs,"A_SiC",{"a_sic","activation_energy_sic"}),
+            )
+
+        def _release_rate(
+            self,
+            temperature: float,
+            d0_pyc: float,
+            activation_energy_pyc: float,
+            d0_sic: float,
+            activation_energy_sic: float,
+        ) -> np.ndarray:
+            """计算一个温度下的三层球壳外表面单位面积释放率。"""
+
+            diffusivity_pyc = _arrhenius_diffusivity(d0_pyc,activation_energy_pyc,temperature)
+            diffusivity_sic = _arrhenius_diffusivity(d0_sic,activation_energy_sic,temperature)
+            solver = _ThreeLayerSphericalShellSolver(diffusivity_pyc,diffusivity_sic)
+
+            return solver.release_rate(self.times)
+
+        def forward(
+            self,
+            theta: dict[str,float],
+            procedure_file_label: str,
+        ) -> ModelResult:
+            """返回各温度实验对应的命名释放率数据集。"""
+
+            del procedure_file_label
+            diffusion_parameters = self._diffusion_parameters(theta)
+            values = {}
+            sources = {}
+
+            for dataset_name,dataset in self.datasets.items():
+                raw_result = {
+                    "time":self.times,
+                    "release_rate":self._release_rate(dataset.temperature,*diffusion_parameters),
+                }
+                component_order = list(dataset.component_map)
+                dataset_values = Model._dataset_values(raw_result,dataset.component_map)
+                values[dataset_name] = dataset_values
+                sources[dataset_name] = {
+                    "case":dataset_name,
+                    "temperature":float(dataset.temperature),
+                    "component_order":component_order,
+                    "component_index":{name:index for index,name in enumerate(component_order)},
+                    "shape":dataset_values.shape,
+                    "dtype":str(dataset_values.dtype),
+                }
+
+            return ModelResult(
+                names=list(values),
+                values=values,
+                metadata={"sources":sources},
+            )
+
     def __init__(
         self,
         model_config: InputCard.Model,
@@ -320,6 +477,15 @@ class Model:
                 self.model_config.mars,
             )
             return mars.mars
+
+        if self.model_config.type == "three_layer_spherical_shell":
+            config = self.model_config.three_layer_spherical_shell
+            if config is None:
+                raise ValueError("缺少 model.three_layer_spherical_shell 配置")
+            model = self.ThreeLayerSphericalShell(
+                self.parameter_names,config
+            )
+            return model.forward
 
         raise NotImplementedError(
             f"未实现的正向模型: {self.model_config.type}"

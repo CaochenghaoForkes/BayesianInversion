@@ -25,6 +25,7 @@ py-modules = [
     "data",
     "prior",
     "model",
+    "three_layer_spherical_shell",
     "likelihood",
     "posterior",
     "sampler",
