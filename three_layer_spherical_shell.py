@@ -11,6 +11,7 @@ from scipy.optimize import brentq
 
 
 GAS_CONSTANT = 8.31446261815324  # J/(mol K)
+CM2_TO_M2 = 1.0e-4
 
 
 @dataclass(frozen=True)
@@ -23,9 +24,9 @@ class SphericalShellSettings:
     thickness_opyc: float = 40.0e-6
     mass_transfer_coefficient: float = 1.0e-4
     source_concentration: float = 1.0
-    number_of_modes: int = 12
-    quadrature_order: int = 16
-    samples_per_mode: int = 6
+    number_of_modes: int = 48
+    quadrature_order: int = 64
+    samples_per_mode: int = 80
 
 
 DEFAULT_SETTINGS = SphericalShellSettings()
@@ -54,7 +55,7 @@ def arrhenius_diffusivity(
     activation_energy: float,
     temperature: float,
 ) -> float:
-    """Return D(T)=D0*exp[-A/(R*T)] in m^2/s."""
+    """Convert input D0 in cm^2/s to D(T) in m^2/s for meter-based geometry."""
 
     pre_exponential = float(pre_exponential)
     activation_energy = float(activation_energy)
@@ -66,7 +67,7 @@ def arrhenius_diffusivity(
     if temperature <= 0.0 or not np.isfinite(temperature):
         raise ValueError("绝对温度必须为有限正数")
 
-    diffusivity = pre_exponential*np.exp(
+    diffusivity = pre_exponential*CM2_TO_M2*np.exp(
         -activation_energy/(GAS_CONSTANT*temperature)
     )
     if diffusivity <= 0.0 or not np.isfinite(diffusivity):
